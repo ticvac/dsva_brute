@@ -2,12 +2,14 @@ mod args;
 mod commands;
 mod communication;
 mod utils;
+mod messages;
 
 use commands::process_commands;
 use communication::listen;
 use args::Args;
 use utils::Node;
 use utils::Friend;
+use utils::parse_address;
 
 use clap::Parser;
 use std::thread;
@@ -15,19 +17,13 @@ use std::thread;
 
 fn main() {
     let args = Args::parse();
-    let my_address = format!("127.0.0.1:{}", args.port);
+    let my_address = parse_address(&format!("{}", args.port));
     
     // loading friends
     let friends: Vec<Friend> = args.friends
         .into_iter()
         .map(|f| {
-            let address = if f.contains(':') {
-                // Already has IP:port format
-                f
-            } else {
-                // Only port number, assume localhost
-                format!("127.0.0.1:{}", f)
-            };
+            let address = parse_address(&f);
             Friend::new(address)
         })
         .collect();

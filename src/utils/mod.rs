@@ -15,6 +15,10 @@ impl Friend {
             free_power: 0,
         }
     }
+
+    pub fn address(&self) -> &str {
+        &self.address
+    }
 }
 
 #[derive(Debug)]
@@ -63,4 +67,23 @@ impl Node {
         print!("{}", output);
     }
 
+    pub fn is_friend(&self, address: &str) -> bool {
+        let friends = self.friends.lock().unwrap();
+        friends.iter().any(|f| f.address() == address)
+    }
+
+    pub fn remove_friend(&self, address: &str) {
+        let mut friends = self.friends.lock().unwrap();
+        friends.retain(|f| f.address() != address);
+        println!("Removed friend: {}", address);
+    }
+}
+
+
+pub fn parse_address(input: &str) -> String {
+    if input.contains(':') {
+        input.to_string()
+    } else {
+        format!("127.0.0.1:{}", input)
+    }
 }

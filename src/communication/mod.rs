@@ -3,6 +3,7 @@ use std::io::Read;
 use std::thread;
 use crate::Node;
 
+
 fn read_message(_stream: &mut std::net::TcpStream) -> Option<String> {
     let mut buffer = [0; 1024];
     match _stream.read(&mut buffer) {
