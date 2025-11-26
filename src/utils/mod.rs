@@ -27,6 +27,10 @@ impl Friend {
     pub fn address(&self) -> &str {
         &self.address
     }
+
+    pub fn set_type(&mut self, friend_type: FriendType) {
+        self.friend_type = friend_type;
+    }
 }
 
 #[derive(Debug)]
@@ -106,6 +110,22 @@ impl Node {
     pub fn set_state_leader(&self) {
         let mut state = self.state.lock().unwrap();
         *state = NodeState::LEADER;
+    }
+
+    pub fn set_state_worker(&self) {
+        let mut state = self.state.lock().unwrap();
+        *state = NodeState::WORKER;
+    }
+
+    pub fn set_parent(&self, address: &str) {
+        let mut friends = self.friends.lock().unwrap();
+        for friend in friends.iter_mut() {
+            if friend.address().trim() == address.trim() {
+                friend.set_type(FriendType::Parent);
+                return;
+            }
+        }
+        panic!("Parent friend with address '{}' not found", address);
     }
 }
 

@@ -2,13 +2,14 @@ use std::net::{TcpListener};
 use std::io::{Read, Write};
 use std::thread;
 use crate::Node;
-use crate::messages::{AckMessage, Message, parse_message, CalculatePowerMessage, CalculateResponseMessage};
+use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessage, Message, PingMessage, parse_message};
 use std::thread::sleep;
 use std::time::Duration;
 
 mod calc_power;
 
 pub use calc_power::calculate_total_power;
+
 
 fn read_message(_stream: &mut std::net::TcpStream) -> Option<String> {
     let mut buffer = [0; 1024];
@@ -58,30 +59,50 @@ pub fn listen(node: Node) {
     }
 }
 
-pub fn handle_new_connection(_node: &Node, _message: Box<dyn Message>, stream: &mut std::net::TcpStream) {
+fn handle_new_connection(_node: &Node, _message: Box<dyn Message>, stream: &mut std::net::TcpStream) {
     // process new connection and return response message
+    
+    // calculate power message
+    if _message.as_any().is::<CalculatePowerMessage>() {
+        handle_calculate_connection(_node, _message, stream);
+        return;
+    } else if _message.as_any().is::<PingMessage>() {
+        _node.add_friend(_message.from().to_string());
+    }
+    // other -> just ack
+    send_acknowledgment(_node, _message, stream);
+
+}
+
+fn send_acknowledgment(_node: &Node, _message: Box<dyn Message>, stream: &mut std::net::TcpStream) {
     let response = AckMessage {
         from: _node.address.clone(),
         to: _message.from().to_string(),
     };
+    let serialized = response.serialize();
+    println!("Sending acknowledgment: {}", serialized);
+    let _ = stream.write_all(serialized.as_bytes());
+}
 
-    // calculate power message
-    if _message.as_any().is::<CalculatePowerMessage>() {
-        println!("Handling CalculatePowerMessage from {}", _message.from());
-        let power = 1;
-        let response = CalculateResponseMessage {
-            from: _node.address.clone(),
-            to: _message.from().to_string(),
-            power,
-        };
-        let serialized = response.serialize();
-        println!("Sending response: {}", serialized);
-        let _ = stream.write_all(serialized.as_bytes());
+
+fn handle_calculate_connection(_node: &Node, _message: Box<dyn Message>, stream: &mut std::net::TcpStream) {
+    // if not idle -> will not work
+    if !_node.is_idle() {
+        send_acknowledgment(_node, _message, stream);
         return;
     }
-    // other -> just ack
+    _node.set_state_worker();
+    // set parent
+    _node.set_parent(_message.from());
+
+    let power = calculate_total_power(_node);
+
+    let response = CalculateResponseMessage {
+        from: _node.address.clone(),
+        to: _message.from().to_string(),
+        power,
+    };
     let serialized = response.serialize();
     println!("Sending response: {}", serialized);
     let _ = stream.write_all(serialized.as_bytes());
-
 }
