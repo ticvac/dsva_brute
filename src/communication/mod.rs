@@ -1,5 +1,5 @@
 use std::net::{TcpListener};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::thread;
 use crate::Node;
 
@@ -19,15 +19,21 @@ pub fn listen(node: Node) {
     // listener on new messages from other nodes
     let listener = TcpListener::bind(&node.address).expect("Failed to bind to port");
     for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let message = read_message(&mut stream.try_clone().unwrap());
-                println!("Received message: {:?}", message);
+        // Check if communication is enabled before accepting connections
+        if !*node.communicating.lock().unwrap() {
+            println!("Communication is off, not accepting connections");
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            continue;
+        }
 
-                // Check if communication is enabled
-                if !*node.communicating.lock().unwrap() {
-                    print!("Ignored message {:?} because communication is off.\n", message);
-                    continue;
+        match stream {
+            Ok(mut stream) => {
+                let message = read_message(&mut stream);
+                println!("Received message: {:?}", message);
+                
+                // Send ACK response
+                if let Err(e) = stream.write_all(b"ACK") {
+                    eprintln!("Failed to send ACK: {}", e);
                 }
                 
                 // Handle the connection in a new thread

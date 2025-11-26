@@ -1,5 +1,5 @@
 use std::net::TcpStream;
-use std::io::Write;
+use std::io::{Write, Read};
 use std::time::Duration;
 use crate::Node;
 
@@ -14,6 +14,12 @@ pub trait Message {
 }
 
 pub fn send_message<T: Message>(message: &T, node: &Node) {
+    // Check if communication is enabled
+    if !node.is_communicating() {
+        eprintln!("Cannot send message, communication is off");
+        return;
+    }
+
     // Prevent sending to same node
     if message.to() == node.address {
         eprintln!("Cannot send message to self: {}", message.to());
@@ -34,12 +40,32 @@ pub fn send_message<T: Message>(message: &T, node: &Node) {
         Duration::from_secs(3)
     ) {
         Ok(mut stream) => {
-            // Set write timeout as well
+            // Set timeouts
             let _ = stream.set_write_timeout(Some(Duration::from_secs(3)));
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
+            
             let serialized = message.serialize();
             if let Err(e) = stream.write_all(serialized.as_bytes()) {
                 eprintln!("Failed to write to {}: {}", message.to(), e);
                 node.remove_friend(message.to());
+                return;
+            }
+
+            // Wait for ACK
+            let mut buffer = [0; 3];
+            match stream.read_exact(&mut buffer) {
+                Ok(_) => {
+                    if &buffer == b"ACK" {
+                        println!("Received ACK from {}", message.to());
+                    } else {
+                        eprintln!("Invalid response from {}", message.to());
+                        node.remove_friend(message.to());
+                    }
+                }
+                Err(e) => {
+                    eprintln!("No ACK received from {}: {}", message.to(), e);
+                    node.remove_friend(message.to());
+                }
             }
         }
         Err(e) => {

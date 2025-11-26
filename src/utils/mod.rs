@@ -77,6 +77,10 @@ impl Node {
         friends.retain(|f| f.address() != address);
         println!("Removed friend: {}", address);
     }
+
+    pub fn is_communicating(&self) -> bool {
+        *self.communicating.lock().unwrap()
+    }
 }
 
 
