@@ -1,6 +1,7 @@
 mod send_message;
 
 pub use send_message::send_message;
+use std::any::Any;
 
 pub fn parse_message(s: &str) -> Option<Box<dyn Message>> {
     let parts: Vec<&str> = s.splitn(4, '|').collect();
@@ -17,10 +18,10 @@ pub fn parse_message(s: &str) -> Option<Box<dyn Message>> {
             from: parts[1].to_string(),
             to: parts[2].to_string(),
         })),
-        "CALC_RESPONSE" => Some(Box::new(CalculationResponseMessage {
+        "CALC_RESPONSE" => Some(Box::new(CalculateResponseMessage {
             from: parts[1].to_string(),
             to: parts[2].to_string(),
-            result: parts[3].parse().unwrap_or(0),
+            power: parts[3].parse().unwrap_or(0),
         })),
         _ => None,
     }
@@ -30,6 +31,8 @@ pub trait Message {
     fn from(&self) -> &str;
     fn to(&self) -> &str;
     fn serialize(&self) -> String;
+
+    fn as_any(&self) -> &dyn Any;
 }
 
 #[derive(Debug)]
@@ -49,6 +52,10 @@ impl Message for PingMessage {
 
     fn serialize(&self) -> String {
         format!("PING|{}|{}", self.from, self.to)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -70,6 +77,10 @@ impl Message for AckMessage {
     fn serialize(&self) -> String {
         format!("ACK|{}|{}", self.from, self.to)
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 pub struct CalculatePowerMessage {
@@ -89,15 +100,19 @@ impl Message for CalculatePowerMessage {
     fn serialize(&self) -> String {
         format!("CALC|{}|{}", self.from, self.to)
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
-pub struct CalculationResponseMessage {
+pub struct CalculateResponseMessage {
     pub from: String,
     pub to: String,
-    pub result: usize,
+    pub power: u32,
 }
 
-impl Message for CalculationResponseMessage {
+impl Message for CalculateResponseMessage {
     fn from(&self) -> &str {
         &self.from
     }
@@ -107,6 +122,10 @@ impl Message for CalculationResponseMessage {
     }
 
     fn serialize(&self) -> String {
-        format!("CALC_RESPONSE|{}|{}|{}", self.from, self.to, self.result)
+        format!("CALC_RESPONSE|{}|{}|{}", self.from, self.to, self.power)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }

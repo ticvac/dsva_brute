@@ -10,9 +10,9 @@ pub enum FriendType {
 
 #[derive(Debug)]
 pub struct Friend {
-    address: String,
-    power: u32,
-    friend_type: FriendType,
+    pub address: String,
+    pub power: u32,
+    pub friend_type: FriendType,
 }
 
 impl Friend {
@@ -39,9 +39,9 @@ pub enum NodeState {
 #[derive(Debug, Clone)]
 pub struct Node {
     pub address: String,
-    friends: Arc<Mutex<Vec<Friend>>>,
+    pub friends: Arc<Mutex<Vec<Friend>>>,
     pub communicating: Arc<Mutex<bool>>,
-    state: Arc<Mutex<NodeState>>,
+    pub state: Arc<Mutex<NodeState>>,
 }
 
 impl Node {

@@ -2,7 +2,7 @@ use std::net::{TcpListener};
 use std::io::{Read, Write};
 use std::thread;
 use crate::Node;
-use crate::messages::{AckMessage, Message, parse_message};
+use crate::messages::{AckMessage, Message, parse_message, CalculatePowerMessage, CalculateResponseMessage};
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -64,13 +64,22 @@ pub fn handle_new_connection(_node: &Node, _message: Box<dyn Message>, stream: &
         from: _node.address.clone(),
         to: _message.from().to_string(),
     };
-    let msg_str = _message.serialize();
-    match msg_str {
-        _ => {
-            print!("Handling message: {}", _message.serialize());
-        }
-    }
 
+    // calculate power message
+    if _message.as_any().is::<CalculatePowerMessage>() {
+        println!("Handling CalculatePowerMessage from {}", _message.from());
+        let power = 1;
+        let response = CalculateResponseMessage {
+            from: _node.address.clone(),
+            to: _message.from().to_string(),
+            power,
+        };
+        let serialized = response.serialize();
+        println!("Sending response: {}", serialized);
+        let _ = stream.write_all(serialized.as_bytes());
+        return;
+    }
+    // other -> just ack
     let serialized = response.serialize();
     println!("Sending response: {}", serialized);
     let _ = stream.write_all(serialized.as_bytes());
