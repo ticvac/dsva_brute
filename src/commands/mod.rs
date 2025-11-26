@@ -57,7 +57,7 @@ fn handle_ping_command(_node: &Node, parts: Vec<&str>) {
         from: _node.address.clone(),
         to: address,
     };
-    send_message(&message, _node);
+    send_message::send_message(&message, _node);
 }
 
 fn handle_connect_command(_node: &Node, parts: Vec<&str>) {
