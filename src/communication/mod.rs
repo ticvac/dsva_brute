@@ -6,6 +6,10 @@ use crate::messages::{AckMessage, Message, parse_message};
 use std::thread::sleep;
 use std::time::Duration;
 
+mod calc_power;
+
+pub use calc_power::calculate_total_power;
+
 fn read_message(_stream: &mut std::net::TcpStream) -> Option<String> {
     let mut buffer = [0; 1024];
     match _stream.read(&mut buffer) {
@@ -60,6 +64,12 @@ pub fn handle_new_connection(_node: &Node, _message: Box<dyn Message>, stream: &
         from: _node.address.clone(),
         to: _message.from().to_string(),
     };
+    let msg_str = _message.serialize();
+    match msg_str {
+        _ => {
+            print!("Handling message: {}", _message.serialize());
+        }
+    }
 
     let serialized = response.serialize();
     println!("Sending response: {}", serialized);

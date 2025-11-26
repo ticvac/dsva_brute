@@ -1,10 +1,18 @@
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
+pub enum FriendType {
+    Parent,
+    Child,
+    NotSpecified,
+}
+
+
+#[derive(Debug)]
 pub struct Friend {
     address: String,
     power: u32,
-    free_power: u32,
+    friend_type: FriendType,
 }
 
 impl Friend {
@@ -12,7 +20,7 @@ impl Friend {
         Friend {
             address,
             power: 0,
-            free_power: 0,
+            friend_type: FriendType::NotSpecified,
         }
     }
 
@@ -24,9 +32,8 @@ impl Friend {
 #[derive(Debug)]
 pub enum NodeState {
     IDLE,
-    COMPUTING {
-        parent: String,
-    }
+    LEADER,
+    WORKER,
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +97,15 @@ impl Node {
 
     pub fn is_communicating(&self) -> bool {
         *self.communicating.lock().unwrap()
+    }
+
+    pub fn is_idle(&self) -> bool {
+        matches!(*self.state.lock().unwrap(), NodeState::IDLE)
+    }
+
+    pub fn set_state_leader(&self) {
+        let mut state = self.state.lock().unwrap();
+        *state = NodeState::LEADER;
     }
 }
 

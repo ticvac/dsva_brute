@@ -3,7 +3,9 @@ use crate::Node;
 use crate::messages;
 use crate::utils::parse_address;
 
-use messages::{PingMessage, send_message};
+use messages::{PingMessage};
+use messages::send_message;
+use crate::communication::calculate_total_power;
 
 
 pub fn process_commands(_node: &Node) {
@@ -37,6 +39,9 @@ pub fn process_commands(_node: &Node) {
             "connect" => {
                 handle_connect_command(_node, parts);
             }
+            "cal" => {
+                handle_calculate_command(_node);
+            }
             _ => {
                 println!("Unknown command: {}", line);
             }
@@ -57,7 +62,7 @@ fn handle_ping_command(_node: &Node, parts: Vec<&str>) {
         from: _node.address.clone(),
         to: address,
     };
-    send_message::send_message(&message, _node);
+    send_message(&message, _node);
 }
 
 fn handle_connect_command(_node: &Node, parts: Vec<&str>) {
@@ -72,4 +77,18 @@ fn handle_connect_command(_node: &Node, parts: Vec<&str>) {
     // now ping it
     let address_str = address.to_string();
     handle_ping_command(_node, vec!["ping", &address_str]);
+}
+
+fn handle_calculate_command(_node: &Node) {
+    if !_node.is_idle() {
+        println!("Node is not idle.");
+        return;
+    }
+    println!("Starting calculation...");
+
+    // set to leader
+    _node.set_state_leader();
+    // calculate power
+    let total_power = calculate_total_power(_node);
+    println!("Total calculated power: {}", total_power);
 }
