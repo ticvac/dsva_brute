@@ -44,6 +44,7 @@ pub fn process_commands(_node: &Node) {
     }
 }
 
+// can block thread up to timeout in send_message !!!
 fn handle_ping_command(_node: &Node, parts: Vec<&str>) {
     if parts.len() < 2 {
         println!("Usage: ping <address/port>");
@@ -55,7 +56,6 @@ fn handle_ping_command(_node: &Node, parts: Vec<&str>) {
     let message = PingMessage {
         from: _node.address.clone(),
         to: address,
-        command: "ping".to_string(),
     };
     send_message(&message, _node);
 }

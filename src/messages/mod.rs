@@ -3,14 +3,25 @@ use std::io::{Write, Read};
 use std::time::Duration;
 use crate::Node;
 
+pub fn parse_message(s: &str) -> Option<Box<dyn Message>> {
+    let parts: Vec<&str> = s.splitn(4, '|').collect();
+    match parts[0] {
+        "PING" => Some(Box::new(PingMessage {
+            from: parts[1].to_string(),
+            to: parts[2].to_string(),
+        })),
+        "ACK" => Some(Box::new(AckMessage {
+            from: parts[1].to_string(),
+            to: parts[2].to_string(),
+        })),
+        _ => None,
+    }
+}
+
 pub trait Message {
     fn from(&self) -> &str;
-
     fn to(&self) -> &str;
-
     fn serialize(&self) -> String;
-
-    fn deserialize(s: &str) -> Self where Self: Sized;
 }
 
 pub fn send_message<T: Message>(message: &T, node: &Node) {
@@ -51,19 +62,20 @@ pub fn send_message<T: Message>(message: &T, node: &Node) {
                 return;
             }
 
-            // Wait for ACK
-            let mut buffer = [0; 3];
-            match stream.read_exact(&mut buffer) {
-                Ok(_) => {
-                    if &buffer == b"ACK" {
-                        println!("Received ACK from {}", message.to());
+            // Wait for a response message and parse it
+            let mut buffer = [0u8; 1024];
+            match stream.read(&mut buffer) {
+                Ok(n) if n > 0 => {
+                    let response = String::from_utf8_lossy(&buffer[..n]);
+                    if parse_message(&response).is_some() {
+                        println!("Received valid message from {}", message.to());
                     } else {
-                        eprintln!("Invalid response from {}", message.to());
+                        eprintln!("Failed to parse response from {}: {}", message.to(), response);
                         node.remove_friend(message.to());
                     }
                 }
-                Err(e) => {
-                    eprintln!("No ACK received from {}: {}", message.to(), e);
+                Ok(_) | Err(_) => {
+                    eprintln!("No response received from {}", message.to());
                     node.remove_friend(message.to());
                 }
             }
@@ -79,7 +91,6 @@ pub fn send_message<T: Message>(message: &T, node: &Node) {
 pub struct PingMessage {
     pub from: String,
     pub to: String,
-    pub command: String,
 }
 
 impl Message for PingMessage {
@@ -92,15 +103,25 @@ impl Message for PingMessage {
     }
 
     fn serialize(&self) -> String {
-        format!("PING|{}|{}|{}", self.from, self.to, self.command)
+        format!("PING|{}|{}", self.from, self.to)
+    }
+}
+
+pub struct AckMessage {
+    pub from: String,
+    pub to: String,
+}
+
+impl Message for AckMessage {
+    fn from(&self) -> &str {
+        &self.from
     }
 
-    fn deserialize(s: &str) -> Self {
-        let parts: Vec<&str> = s.splitn(4, '|').collect();
-        PingMessage {
-            from: parts[1].to_string(),
-            to: parts[2].to_string(),
-            command: parts[3].to_string(),
-        }
+    fn to(&self) -> &str {
+        &self.to
+    }
+
+    fn serialize(&self) -> String {
+        format!("ACK|{}|{}", self.from, self.to)
     }
 }
