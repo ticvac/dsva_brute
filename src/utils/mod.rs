@@ -78,6 +78,16 @@ impl Node {
         println!("Removed friend: {}", address);
     }
 
+    pub fn add_friend(&self, address: String) {
+        let mut friends = self.friends.lock().unwrap();
+        if !friends.iter().any(|f| f.address() == address) {
+            friends.push(Friend::new(address.clone()));
+            println!("Added friend: {}", address);
+        } else {
+            println!("Friend {} already exists", address);
+        }
+    }
+
     pub fn is_communicating(&self) -> bool {
         *self.communicating.lock().unwrap()
     }

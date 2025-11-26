@@ -34,6 +34,9 @@ pub fn process_commands(_node: &Node) {
                 *comm = !*comm;
                 println!("Communicating set to {}", *comm);
             }
+            "connect" => {
+                handle_connect_command(_node, parts);
+            }
             _ => {
                 println!("Unknown command: {}", line);
             }
@@ -55,4 +58,18 @@ fn handle_ping_command(_node: &Node, parts: Vec<&str>) {
         command: "ping".to_string(),
     };
     send_message(&message, _node);
+}
+
+fn handle_connect_command(_node: &Node, parts: Vec<&str>) {
+    if parts.len() < 2 {
+        println!("Usage: connect <address/port>");
+        return;
+    }
+    let address = parse_address(parts[1]);
+    println!("Connecting to {}", address);
+    // add to friends
+    _node.add_friend(address.clone());
+    // now ping it
+    let address_str = address.to_string();
+    handle_ping_command(_node, vec!["ping", &address_str]);
 }
