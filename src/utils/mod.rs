@@ -107,6 +107,10 @@ impl Node {
         matches!(*self.state.lock().unwrap(), NodeState::IDLE)
     }
 
+    pub fn is_leader(&self) -> bool {
+        matches!(*self.state.lock().unwrap(), NodeState::LEADER)
+    }
+
     pub fn set_state_leader(&self) {
         let mut state = self.state.lock().unwrap();
         *state = NodeState::LEADER;

@@ -3,6 +3,7 @@ mod commands;
 mod communication;
 mod utils;
 mod messages;
+mod problem;
 
 use commands::process_commands;
 use communication::listen;
