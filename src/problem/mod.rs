@@ -128,7 +128,6 @@ impl Problem {
 
     pub fn brute_force(&mut self, stop_flag: AtomicBool) -> Option<String> {
         loop {
-            println!("Trying candidate: {}", self.current);
             if stop_flag.load(Relaxed) {
                 return None;
             }
@@ -238,8 +237,4 @@ impl Problem {
         let hash_string = format!("{:x}", result);
         hash_string == self.hash
     }
-
-    // total_combinations is now in Combinable trait
-
-
 }

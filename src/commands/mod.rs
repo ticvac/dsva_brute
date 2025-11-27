@@ -11,6 +11,7 @@ use crate::problem::{Problem};
 use crate::problem::Combinable;
 
 use crate::communication::{send_parts_to_friends, assign_parts_to_self_and_friends};
+use std::sync::atomic::{AtomicBool};
 
 
 pub fn process_commands(_node: &Node) {
@@ -143,6 +144,17 @@ fn handle_solve_command(_node: &Node, parts: Vec<&str>) {
     }
     assign_parts_to_self_and_friends(_node, parts);
     send_parts_to_friends(_node);
-    // solve my part in separate thread (not implemented here)
+    // solve my part in new thread
     println!("LEADER started solving problem...");
+    let problem_part = _node.solving_part_of_a_problem.lock().unwrap().as_ref().unwrap().clone();
+    std::thread::spawn(move || {
+        let mut problem = Problem::new_from_part(&problem_part);
+        // No stop flag for now
+        let stop_flag = AtomicBool::new(false);
+        match problem.brute_force(stop_flag) {
+            Some(solution) => println!("Solution found: {}", solution),
+            None => println!("No solution found in my part."),
+        }
+    });
+
 }

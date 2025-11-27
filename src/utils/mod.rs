@@ -36,9 +36,6 @@ impl Friend {
         self.friend_type = friend_type;
     }
 
-    pub fn is_parent(&self) -> bool {
-        matches!(self.friend_type, FriendType::Parent)
-    }
 
     pub fn is_child(&self) -> bool {
         matches!(self.friend_type, FriendType::Child)

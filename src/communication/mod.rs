@@ -117,12 +117,7 @@ fn handle_calculate_connection(_node: &Node, _message: Box<dyn Message>, stream:
 fn handle_solve_message(_node: &Node, _message: Box<dyn Message>, _stream: &mut std::net::TcpStream) {
     let problem_message = _message.as_any().downcast_ref::<SolveProblemMessage>().unwrap();
     println!("Received solve problem message: {:?}", problem_message);
-    let problem = Problem::new(
-        problem_message.alphabet.clone(),
-        problem_message.start.clone(),
-        problem_message.end.clone(),
-        problem_message.hash.clone(),
-    );
+    let problem = Problem::new_from_solve_message(problem_message);
     let mut available_power = _node.friends.lock().unwrap().iter().filter(|friend| friend.is_child()).map(|friend| friend.power).sum::<u32>();
     available_power += _node.power;
     let parts = problem.divide_into_n(available_power as usize);
