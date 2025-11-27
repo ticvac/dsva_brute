@@ -2,7 +2,7 @@ use std::net::{TcpListener};
 use std::io::{Read, Write};
 use std::thread;
 use crate::Node;
-use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessage, Message, PingMessage, parse_message};
+use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessage, Message, PingMessage, parse_message, SolveProblemMessage};
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -59,6 +59,7 @@ pub fn listen(node: Node) {
     }
 }
 
+// every new connection in separate thread...
 fn handle_new_connection(_node: &Node, _message: Box<dyn Message>, stream: &mut std::net::TcpStream) {
     // process new connection and return response message
     
@@ -68,10 +69,11 @@ fn handle_new_connection(_node: &Node, _message: Box<dyn Message>, stream: &mut 
         return;
     } else if _message.as_any().is::<PingMessage>() {
         _node.add_friend(_message.from().to_string());
+    } else if _message.as_any().is::<SolveProblemMessage>() {
+        handle_solve_message(_node, _message.clone_box(), stream);
     }
-    // other -> just ack
+    // always send ack at the end
     send_acknowledgment(_node, _message, stream);
-
 }
 
 fn send_acknowledgment(_node: &Node, _message: Box<dyn Message>, stream: &mut std::net::TcpStream) {
@@ -105,4 +107,15 @@ fn handle_calculate_connection(_node: &Node, _message: Box<dyn Message>, stream:
     let serialized = response.serialize();
     println!("Sending response: {}", serialized);
     let _ = stream.write_all(serialized.as_bytes());
+}
+
+
+fn handle_solve_message(_node: &Node, _message: Box<dyn Message>, _stream: &mut std::net::TcpStream) {
+    // create problem
+    let problem_message = _message.as_any().downcast_ref::<SolveProblemMessage>().unwrap();
+    println!("Received solve problem message: {:?}", problem_message);
+    // divide info parts
+    // assign part to self
+    // send parts to friends
+    // solve my part // I am already in thread ;) dont need to spawn new one
 }

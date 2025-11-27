@@ -8,7 +8,7 @@ use messages::{PingMessage};
 use messages::send_message;
 use crate::communication::calculate_total_power;
 
-use crate::problem::Problem;
+use crate::problem::{Problem, merge_parts};
 use crate::problem::Combinable;
 
 
@@ -141,12 +141,46 @@ fn handle_solve_command(_node: &Node, parts: Vec<&str>) {
     println!("Problem defined: {:?}", problem);
     println!("Total combinations to try: {}", problem.total_combinations());
 
-    let total_pieces = 9;
+    let mut available_power = _node.friends.lock().unwrap().iter()
+        .map(|friend| friend.power)
+        .sum::<u32>();
+    available_power += _node.power;
+
+    let total_pieces = available_power as usize;
     let parts = problem.divide_into_n(total_pieces);
     println!("Divided into {} parts.", parts.len());
     for (i, part) in parts.iter().enumerate() {
         println!("Part {}: {:?}, combinations: {}", i, part, part.total_combinations());
     }
+
+    // set my part...
+    let my_part = parts.get(0);
+    _node.solving_part_of_a_problem.lock().unwrap().replace((*my_part.unwrap()).clone());
+
+    // setting parts to friends
+    let mut part_index = 1; // 0 is for myself
+    let parts = parts; // make mutable for draining
+    let friends = _node.friends.lock().unwrap();
+    for friend in friends.iter() {
+        if friend.is_child() && friend.power > 0 {
+            let take_n = friend.power as usize;
+            if part_index + take_n > parts.len() + 1 {
+                // Not enough parts left
+                break;
+            }
+            let merged = merge_parts(&parts[part_index..part_index+take_n].to_vec());
+            // Here you would send the merged part to the friend, e.g. via a message
+            println!("Assigning to friend {}: {:?}", friend.address, merged);
+            part_index += take_n;
+        }
+    }
+    drop(friends);
+
+    // sending parts...
+    send_parts_to_friends(_node);
+
+    
+    // solve my part in separate thread
     
 
     return;

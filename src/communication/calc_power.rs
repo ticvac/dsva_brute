@@ -5,7 +5,7 @@ use crate::utils::FriendType;
 
 pub fn calculate_total_power(node: &Node) -> u32 {
     println!("Calculating total power...");
-    let mut total_power = 1; // my power is 1
+    let mut total_power = node.power; // my power is 1
     let mut handles = vec![];
     let mut friend_addresses = vec![];
 

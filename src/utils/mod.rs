@@ -1,5 +1,7 @@
 use std::sync::{Arc, Mutex};
 
+use crate::problem::PartOfAProblem;
+
 #[derive(Debug)]
 pub enum FriendType {
     Parent,
@@ -11,16 +13,18 @@ pub enum FriendType {
 #[derive(Debug)]
 pub struct Friend {
     pub address: String,
-    pub power: u32,
     pub friend_type: FriendType,
+    pub power: u32,
+    pub solving_part_of_a_problem: Option<PartOfAProblem>
 }
 
 impl Friend {
     pub fn new(address: String) -> Self {
         Friend {
             address,
-            power: 0,
             friend_type: FriendType::NotSpecified,
+            power: 0,
+            solving_part_of_a_problem: None,
         }
     }
 
@@ -30,6 +34,14 @@ impl Friend {
 
     pub fn set_type(&mut self, friend_type: FriendType) {
         self.friend_type = friend_type;
+    }
+
+    pub fn is_parent(&self) -> bool {
+        matches!(self.friend_type, FriendType::Parent)
+    }
+
+    pub fn is_child(&self) -> bool {
+        matches!(self.friend_type, FriendType::Child)
     }
 }
 
@@ -46,6 +58,8 @@ pub struct Node {
     pub friends: Arc<Mutex<Vec<Friend>>>,
     pub communicating: Arc<Mutex<bool>>,
     pub state: Arc<Mutex<NodeState>>,
+    pub power: u32,
+    pub solving_part_of_a_problem: Arc<Mutex<Option<PartOfAProblem>>>,
 }
 
 impl Node {
@@ -55,6 +69,8 @@ impl Node {
             friends: Arc::new(Mutex::new(friends)),
             communicating: Arc::new(Mutex::new(true)),
             state: Arc::new(Mutex::new(NodeState::IDLE)),
+            power: 1,
+            solving_part_of_a_problem: Arc::new(Mutex::new(None)),
         }
     }
     
@@ -68,6 +84,7 @@ impl Node {
         output.push_str(&format!("Node Address: {}\n", self.address));
         output.push_str(&format!("Communicating: {}\n", *communicating));
         output.push_str(&format!("State: {:?}\n", *state));
+        output.push_str(&format!("Solving Part Of A Problem: {:?}\n", *self.solving_part_of_a_problem.lock().unwrap()));
         output.push_str("Friends:\n");
         for friend in friends.iter() {
             output.push_str(&format!(" - {:?}\n", friend));

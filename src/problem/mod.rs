@@ -1,17 +1,18 @@
 use sha2::{Sha256, Digest};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use crate::messages::SolveProblemMessage;
 
 pub trait Combinable {
     fn total_combinations(&self) -> usize;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PartOfAProblemState {
     NotDistributed,
     Distributed,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PartOfAProblem {
     pub start: String,
     pub end: String,
@@ -36,7 +37,30 @@ impl Combinable for PartOfAProblem {
             0
         }
     }
-    
+}
+
+pub fn merge_parts(parts: &Vec<PartOfAProblem>) -> PartOfAProblem {
+    let mut sorted_parts = parts.clone();
+    let alphabet = parts[0].alphabet.clone();
+    // Sort by start using the alphabet order
+    let alphabet_str = &alphabet;
+    let str_to_index = |s: &str| -> usize {
+        let alphabet_size = alphabet_str.len();
+        s.chars().fold(0, |acc, c| {
+            acc * alphabet_size + alphabet_str.find(c).unwrap()
+        })
+    };
+    sorted_parts.sort_by_key(|p| str_to_index(&p.start));
+    let hash = sorted_parts[0].hash.clone();
+    let start = sorted_parts.first().unwrap().start.clone();
+    let end = sorted_parts.last().unwrap().end.clone();
+    PartOfAProblem {
+        start,
+        end,
+        alphabet,
+        hash,
+        state: PartOfAProblemState::NotDistributed,
+    }
 }
 
 #[derive(Debug)]
@@ -79,6 +103,26 @@ impl Problem {
             end: end.clone(),
             hash,
             current: start,
+        }
+    }
+
+    pub fn new_from_solve_message(message: &SolveProblemMessage) -> Self {
+        Problem {
+            alphabet: message.alphabet.clone(),
+            start: message.start.clone(),
+            end: message.end.clone(),
+            hash: message.hash.clone(),
+            current: message.start.clone(),
+        }
+    }
+
+    pub fn new_from_part(part: &PartOfAProblem) -> Self {
+        Problem {
+            alphabet: part.alphabet.clone(),
+            start: part.start.clone(),
+            end: part.end.clone(),
+            hash: part.hash.clone(),
+            current: part.start.clone(),
         }
     }
 
