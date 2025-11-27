@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::problem::PartOfAProblem;
 
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum FriendType {
     Parent,
     Child,

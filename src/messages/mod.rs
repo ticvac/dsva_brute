@@ -5,7 +5,7 @@ use core::str;
 use std::any::Any;
 
 pub fn parse_message(s: &str) -> Option<Box<dyn Message>> {
-    let parts: Vec<&str> = s.splitn(4, '|').collect();
+    let parts: Vec<&str> = s.splitn(10, '|').collect();
     match parts[0] {
         "PING" => Some(Box::new(PingMessage {
             from: parts[1].to_string(),

@@ -242,6 +242,4 @@ impl Problem {
     // total_combinations is now in Combinable trait
 
 
-
-
 }

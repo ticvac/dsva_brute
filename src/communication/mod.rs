@@ -5,10 +5,14 @@ use crate::Node;
 use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessage, Message, PingMessage, parse_message, SolveProblemMessage};
 use std::thread::sleep;
 use std::time::Duration;
+use crate::problem::{merge_parts, Problem, Combinable};
+
 
 mod calc_power;
+mod send_parts;
 
 pub use calc_power::calculate_total_power;
+pub use send_parts::send_parts_to_friends;
 
 
 fn read_message(_stream: &mut std::net::TcpStream) -> Option<String> {
@@ -111,11 +115,47 @@ fn handle_calculate_connection(_node: &Node, _message: Box<dyn Message>, stream:
 
 
 fn handle_solve_message(_node: &Node, _message: Box<dyn Message>, _stream: &mut std::net::TcpStream) {
-    // create problem
     let problem_message = _message.as_any().downcast_ref::<SolveProblemMessage>().unwrap();
     println!("Received solve problem message: {:?}", problem_message);
-    // divide info parts
-    // assign part to self
-    // send parts to friends
-    // solve my part // I am already in thread ;) dont need to spawn new one
+    let problem = Problem::new(
+        problem_message.alphabet.clone(),
+        problem_message.start.clone(),
+        problem_message.end.clone(),
+        problem_message.hash.clone(),
+    );
+    let mut available_power = _node.friends.lock().unwrap().iter().filter(|friend| friend.is_child()).map(|friend| friend.power).sum::<u32>();
+    available_power += _node.power;
+    let parts = problem.divide_into_n(available_power as usize);
+    println!("Divided into {} parts.", parts.len());
+    for (i, part) in parts.iter().enumerate() {
+        println!("Part {}: {:?}, combinations: {}", i, part, part.total_combinations());
+    }
+    assign_parts_to_self_and_friends(_node, parts);
+    send_parts_to_friends(_node);
+    // (Solving own part happens in this thread)
+    println!("WORKER started solving problem...");
+}
+
+
+// Assign parts to self and friends, shared for both commands and communication
+pub fn assign_parts_to_self_and_friends(_node: &crate::Node, parts: Vec<crate::problem::PartOfAProblem>) {
+    // Assign my part
+    if let Some(my_part) = parts.get(0) {
+        _node.solving_part_of_a_problem.lock().unwrap().replace(my_part.clone());
+    }
+    // Assign parts to friends
+    let mut part_index = 1; // 0 is for myself
+    let mut friends = _node.friends.lock().unwrap();
+    for friend in friends.iter_mut() {
+        if friend.is_child() && friend.power > 0 {
+            let take_n = friend.power as usize;
+            if part_index + take_n > parts.len() + 1 {
+                break;
+            }
+            let merged = merge_parts(&parts[part_index..part_index+take_n].to_vec());
+            println!("Assigning to friend {:?} part: {:?}, total {:?}", friend, merged, merged.total_combinations());
+            friend.solving_part_of_a_problem.replace(merged);
+            part_index += take_n;
+        }
+    }
 }
