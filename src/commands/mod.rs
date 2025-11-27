@@ -9,6 +9,7 @@ use messages::send_message;
 use crate::communication::calculate_total_power;
 
 use crate::problem::Problem;
+use crate::problem::Combinable;
 
 
 pub fn process_commands(_node: &Node) {
@@ -129,19 +130,27 @@ fn handle_solve_command(_node: &Node, parts: Vec<&str>) {
     };
     let hash = parts[4].to_string();
     let start = alphabet.chars().next().unwrap().to_string().repeat(min_length);
-    let end = "bb".to_string(); //alphabet.chars().last().unwrap().to_string().repeat(max_length);
+    let end = alphabet.chars().last().unwrap().to_string().repeat(max_length);
     // problem definition
     let mut problem = Problem::new(
         alphabet,
         start,
         end,
-        max_length,
         hash,
     );
     println!("Problem defined: {:?}", problem);
     println!("Total combinations to try: {}", problem.total_combinations());
-    let stop_flag = AtomicBool::new(false);
 
+    let total_pieces = 9;
+    let parts = problem.divide_into_n(total_pieces);
+    println!("Divided into {} parts.", parts.len());
+    for (i, part) in parts.iter().enumerate() {
+        println!("Part {}: {:?}, combinations: {}", i, part, part.total_combinations());
+    }
+    
+
+    return;
+    let stop_flag = AtomicBool::new(false);
     match problem.brute_force(stop_flag) {
         Some(solution) => {
             println!("Solution found: {}", solution);
