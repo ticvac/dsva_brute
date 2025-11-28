@@ -2,7 +2,7 @@ use std::net::{TcpListener};
 use std::io::{Read, Write};
 use std::thread;
 use crate::Node;
-use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessage, Message, PingMessage, parse_message, SolveProblemMessage, SolveResponseMessage, send_message};
+use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessage, Message, PingMessage, parse_message, SolveProblemMessage, SolveResponseMessage, send_message, StopCalculationMessage};
 use std::thread::sleep;
 use std::time::Duration;
 use crate::problem::{Combinable, Problem, merge_parts, update_state_of_parts};
@@ -78,6 +78,8 @@ fn handle_new_connection(_node: &Node, _message: Box<dyn Message>, stream: &mut 
         handle_solve_message(_node, _message.clone_box());
     } else if _message.as_any().is::<SolveResponseMessage>() {
         handle_solve_response_message(_node, _message.clone_box());
+    } else if _message.as_any().is::<StopCalculationMessage>() {
+        handle_stop_calculate_connection(_node, _message.clone_box());
     }
     // always send ack at the end
     send_acknowledgment(_node, _message, stream);
@@ -165,7 +167,10 @@ fn handle_solve_message(_node: &Node, _message: Box<dyn Message>) {
                     solution: None,
                     space_searched,
                 };
-                send_message(&response, &node_clone);
+                // only send if fully searched - if not - received stop signal and parent already knows
+                if space_searched {
+                    send_message(&response, &node_clone);
+                }
             }
         }
         stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
@@ -208,14 +213,13 @@ pub fn handle_solve_response_message(node: &Node, _message: Box<dyn Message>) {
         send_message(&forward_message, node);
         return;
     }
-    
+
     print!("Leader handling solve response message...\n");
     println!("Received solve response: {:?}", solve_response);
 
     if solve_response.solution.is_some() {
         println!("Solution found by a worker: {}", solve_response.solution.as_ref().unwrap());
-        node.stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
-        // TODO inform all nodes to stop...
+        stop_cal_and_propagate(node);
         return;
     }
     
@@ -230,7 +234,6 @@ pub fn handle_solve_response_message(node: &Node, _message: Box<dyn Message>) {
             PartOfAProblemState::NotDistributed
         },
     };
-    
 
     {
         let mut state = node.state.lock().unwrap();
@@ -241,4 +244,48 @@ pub fn handle_solve_response_message(node: &Node, _message: Box<dyn Message>) {
             println!("After update: {:?}", leader_parts);
         }
     }
+}
+
+
+pub fn handle_stop_calculate_connection(_node: &Node, _message: Box<dyn Message>) {
+    println!("Received STOP_CALC message from {}", _message.from());
+    stop_cal_and_propagate(_node);
+}
+
+pub fn stop_cal_and_propagate(_node: &Node) {
+    if _node.is_leader() {
+        let mut state = _node.state.lock().unwrap();
+        if let NodeState::LEADER { problem, parts } = &mut *state {
+            *problem = None;
+            *parts = Vec::new();
+        }
+    }
+
+    _node.stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+    // Set solving_part_of_a_problem to None for each child and collect their addresses
+    let child_addresses: Vec<String> = {
+        let mut friends = _node.friends.lock().unwrap();
+        friends.iter_mut()
+            .filter_map(|friend| {
+                if friend.is_child() {
+                    friend.solving_part_of_a_problem = None;
+                    Some(friend.address.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    };
+    for address in child_addresses {
+        let from = _node.address.clone();
+        let node_clone = _node.clone();
+        std::thread::spawn(move || {
+            let stop_message = StopCalculationMessage {
+                from,
+                to: address,
+            };
+            send_message(&stop_message, &node_clone);
+        });
+    }
+    *_node.solving_part_of_a_problem.lock().unwrap() = None;
 }

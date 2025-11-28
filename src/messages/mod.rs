@@ -46,7 +46,11 @@ pub fn parse_message(s: &str) -> Option<Box<dyn Message>> {
                 solution,
                 space_searched: parts[6].parse().unwrap_or(false),
             }))
-        }
+        },
+        "STOP_CALC" => Some(Box::new(StopCalculationMessage {
+            from: parts[1].to_string(),
+            to: parts[2].to_string(),
+        })),
         _ => None,
     }
 }
@@ -236,6 +240,34 @@ impl Message for SolveResponseMessage {
             "SOLVE_RESPONSE|{}|{}|{}|{}|{}|{}",
             self.from, self.to, self.start, self.end, solution_str, self.space_searched
         )
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn Message> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StopCalculationMessage {
+    pub from: String,
+    pub to: String,
+}
+
+impl Message for StopCalculationMessage {
+    fn from(&self) -> &str {
+        &self.from
+    }
+
+    fn to(&self) -> &str {
+        &self.to
+    }
+
+    fn serialize(&self) -> String {
+        format!("STOP_CALC|{}|{}", self.from, self.to)
     }
 
     fn as_any(&self) -> &dyn Any {

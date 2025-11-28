@@ -1,5 +1,6 @@
 use std::io::{self, BufRead};
 use crate::Node;
+use crate::communication::stop_cal_and_propagate;
 use crate::messages;
 use crate::problem::PartOfAProblem;
 use crate::problem::update_state_of_parts;
@@ -51,13 +52,9 @@ pub fn process_commands(_node: &Node) {
             "solve" => {
                 handle_solve_command(_node, parts);
             }
+            // should not be called manually on worker
             "stop" => {
-                if _node.stop_flag.load(std::sync::atomic::Ordering::SeqCst) == false {
-                    println!("Stopping current solving...");
-                    _node.stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
-                } else {
-                    println!("No solving in progress.");
-                }
+                stop_cal_and_propagate(_node);
             }
             _ => {
                 println!("Unknown command: {}", line);
