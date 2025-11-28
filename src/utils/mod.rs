@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::problem::PartOfAProblem;
+use std::sync::atomic::{AtomicBool};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum FriendType {
@@ -57,6 +58,8 @@ pub struct Node {
     pub state: Arc<Mutex<NodeState>>,
     pub power: u32,
     pub solving_part_of_a_problem: Arc<Mutex<Option<PartOfAProblem>>>,
+    // default true = not solving
+    pub stop_flag: Arc<AtomicBool>,
 }
 
 impl Node {
@@ -68,6 +71,7 @@ impl Node {
             state: Arc::new(Mutex::new(NodeState::IDLE)),
             power: 1,
             solving_part_of_a_problem: Arc::new(Mutex::new(None)),
+            stop_flag: Arc::new(AtomicBool::new(true)),
         }
     }
     

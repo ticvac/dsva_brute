@@ -11,8 +11,6 @@ use crate::problem::{Problem};
 use crate::problem::Combinable;
 
 use crate::communication::{send_parts_to_friends, assign_parts_to_self_and_friends};
-use std::sync::atomic::{AtomicBool};
-
 
 pub fn process_commands(_node: &Node) {
     let stdin = io::stdin();
@@ -50,6 +48,14 @@ pub fn process_commands(_node: &Node) {
             }
             "solve" => {
                 handle_solve_command(_node, parts);
+            }
+            "stop" => {
+                if _node.stop_flag.load(std::sync::atomic::Ordering::SeqCst) == false {
+                    println!("Stopping current solving...");
+                    _node.stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                } else {
+                    println!("No solving in progress.");
+                }
             }
             _ => {
                 println!("Unknown command: {}", line);
@@ -147,14 +153,14 @@ fn handle_solve_command(_node: &Node, parts: Vec<&str>) {
     // solve my part in new thread
     println!("LEADER started solving problem...");
     let problem_part = _node.solving_part_of_a_problem.lock().unwrap().as_ref().unwrap().clone();
+    _node.stop_flag.store(false, std::sync::atomic::Ordering::SeqCst);
+    let stop_flag = _node.stop_flag.clone();
     std::thread::spawn(move || {
         let mut problem = Problem::new_from_part(&problem_part);
-        // No stop flag for now
-        let stop_flag = AtomicBool::new(false);
-        match problem.brute_force(stop_flag) {
+        // Pass stop_flag from node (as AtomicBool)
+        match problem.brute_force(&*stop_flag) {
             Some(solution) => println!("Solution found: {}", solution),
             None => println!("No solution found in my part."),
         }
     });
-
 }

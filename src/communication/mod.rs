@@ -6,7 +6,6 @@ use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessag
 use std::thread::sleep;
 use std::time::Duration;
 use crate::problem::{merge_parts, Problem, Combinable};
-use std::sync::atomic::{AtomicBool};
 
 mod calc_power;
 mod send_parts;
@@ -130,11 +129,12 @@ fn handle_solve_message(_node: &Node, _message: Box<dyn Message>, _stream: &mut 
     // (Solving own part happens in this thread)
     println!("WORKER started solving problem...");
     // need thread to send ack...
-    let stop_flag = AtomicBool::new(false);
     let problem_part = _node.solving_part_of_a_problem.lock().unwrap().as_ref().unwrap().clone();
+    _node.stop_flag.store(false, std::sync::atomic::Ordering::SeqCst);
+    let stop_flag = _node.stop_flag.clone();
     std::thread::spawn(move || {
         let mut problem = Problem::new_from_part(&problem_part);
-        match problem.brute_force(stop_flag) {
+        match problem.brute_force(&stop_flag) {
             Some(solution) => println!("Solution found: {}", solution),
             None => println!("No solution found in my part."),
         }

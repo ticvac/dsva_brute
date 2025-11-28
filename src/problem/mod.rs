@@ -126,9 +126,10 @@ impl Problem {
         }
     }
 
-    pub fn brute_force(&mut self, stop_flag: AtomicBool) -> Option<String> {
+    pub fn brute_force(&mut self, stop_flag: &AtomicBool) -> Option<String> {
         loop {
             if stop_flag.load(Relaxed) {
+                println!("Brute force stopped by stop flag.");
                 return None;
             }
             if self.check_hash(&self.current) {
