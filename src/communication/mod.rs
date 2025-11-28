@@ -2,7 +2,7 @@ use std::net::{TcpListener};
 use std::io::{Read, Write};
 use std::thread;
 use crate::Node;
-use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessage, Message, PingMessage, parse_message, SolveProblemMessage};
+use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessage, Message, PingMessage, parse_message, SolveProblemMessage, SolveResponseMessage, send_message};
 use std::thread::sleep;
 use std::time::Duration;
 use crate::problem::{merge_parts, Problem, Combinable};
@@ -73,7 +73,9 @@ fn handle_new_connection(_node: &Node, _message: Box<dyn Message>, stream: &mut 
     } else if _message.as_any().is::<PingMessage>() {
         _node.add_friend(_message.from().to_string());
     } else if _message.as_any().is::<SolveProblemMessage>() {
-        handle_solve_message(_node, _message.clone_box(), stream);
+        handle_solve_message(_node, _message.clone_box());
+    } else if _message.as_any().is::<SolveResponseMessage>() {
+        handle_solve_response_message(_node, _message.clone_box());
     }
     // always send ack at the end
     send_acknowledgment(_node, _message, stream);
@@ -113,7 +115,7 @@ fn handle_calculate_connection(_node: &Node, _message: Box<dyn Message>, stream:
 }
 
 
-fn handle_solve_message(_node: &Node, _message: Box<dyn Message>, _stream: &mut std::net::TcpStream) {
+fn handle_solve_message(_node: &Node, _message: Box<dyn Message>) {
     let problem_message = _message.as_any().downcast_ref::<SolveProblemMessage>().unwrap();
     println!("Received solve problem message: {:?}", problem_message);
     let problem = Problem::new_from_solve_message(problem_message);
@@ -132,18 +134,45 @@ fn handle_solve_message(_node: &Node, _message: Box<dyn Message>, _stream: &mut 
     let problem_part = _node.solving_part_of_a_problem.lock().unwrap().as_ref().unwrap().clone();
     _node.stop_flag.store(false, std::sync::atomic::Ordering::SeqCst);
     let stop_flag = _node.stop_flag.clone();
+    let my_address = _node.address.to_string();
+    let parent_address = _node.get_parent_address();
+    let node_clone = _node.clone();
     std::thread::spawn(move || {
         let mut problem = Problem::new_from_part(&problem_part);
         match problem.brute_force(&stop_flag) {
-            Some(solution) => println!("Solution found: {}", solution),
-            None => println!("No solution found in my part."),
+            Some(solution) => {
+                println!("Solution found: {}", solution);
+                let response = SolveResponseMessage {
+                    from: my_address,
+                    to: parent_address,
+                    start: problem_part.start.clone(),
+                    end: problem_part.end.clone(),
+                    solution: Some(solution),
+                    space_searched: true,
+                };
+                send_message(&response, &node_clone);
+            }
+            None => {
+                println!("No solution found in my part.");
+                let space_searched = !stop_flag.load(std::sync::atomic::Ordering::SeqCst);
+                let response = SolveResponseMessage {
+                    from: my_address,
+                    to: parent_address,
+                    start: problem_part.start.clone(),
+                    end: problem_part.end.clone(),
+                    solution: None,
+                    space_searched,
+                };
+                send_message(&response, &node_clone);
+            }
         }
+        stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
     });
 }
 
 
 // Assign parts to self and friends, shared for both commands and communication
-pub fn assign_parts_to_self_and_friends(_node: &crate::Node, parts: Vec<crate::problem::PartOfAProblem>) {
+pub fn assign_parts_to_self_and_friends(_node: &Node, parts: Vec<crate::problem::PartOfAProblem>) {
     // Assign my part
     if let Some(my_part) = parts.get(0) {
         _node.solving_part_of_a_problem.lock().unwrap().replace(my_part.clone());
@@ -163,4 +192,20 @@ pub fn assign_parts_to_self_and_friends(_node: &crate::Node, parts: Vec<crate::p
             part_index += take_n;
         }
     }
+}
+
+pub fn handle_solve_response_message(node: &Node, _message: Box<dyn Message>) {
+    let solve_response = _message.as_any().downcast_ref::<SolveResponseMessage>().unwrap();
+    if !node.is_leader() {
+        // Forward the message to the parent (who will forward to leader)
+        let parent_address = node.get_parent_address();
+        let mut forward_message = solve_response.clone();
+        // Set 'from' to this node, 'to' to parent
+        forward_message.from = node.address.clone();
+        forward_message.to = parent_address.clone();
+        send_message(&forward_message, node);
+        return;
+    }
+    print!("Leader handling solve response message...\n");
+    println!("Received solve response: {:?}", solve_response);
 }

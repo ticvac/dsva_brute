@@ -105,6 +105,7 @@ impl Node {
         let mut friends = self.friends.lock().unwrap();
         friends.retain(|f| f.address() != address);
         println!("Removed friend: {}", address);
+        // TODO if calc - if child - inform parent - if parent - stop and propagate...
     }
 
     pub fn add_friend(&self, address: String) {
@@ -127,6 +128,16 @@ impl Node {
 
     pub fn is_leader(&self) -> bool {
         matches!(*self.state.lock().unwrap(), NodeState::LEADER)
+    }
+
+    pub fn get_parent_address(&self) -> String {
+        let friends = self.friends.lock().unwrap();
+        for friend in friends.iter() {
+            if friend.friend_type == FriendType::Parent {
+                return friend.address.clone();
+            }
+        }
+        panic!("Parent friend not found");
     }
 
     pub fn set_state_leader(&self) {

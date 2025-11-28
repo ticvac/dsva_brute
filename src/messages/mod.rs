@@ -32,6 +32,21 @@ pub fn parse_message(s: &str) -> Option<Box<dyn Message>> {
             end: parts[5].to_string(),
             hash: parts[6].to_string(),
         })),
+        "SOLVE_RESPONSE" => {
+            let solution = if parts[5] == "NONE" {
+                None
+            } else {
+                Some(parts[5].to_string())
+            };
+            Some(Box::new(SolveResponseMessage {
+                from: parts[1].to_string(),
+                to: parts[2].to_string(),
+                start: parts[3].to_string(),
+                end: parts[4].to_string(),
+                solution,
+                space_searched: parts[6].parse().unwrap_or(false),
+            }))
+        }
         _ => None,
     }
 }
@@ -181,6 +196,45 @@ impl Message for SolveProblemMessage {
         format!(
             "SOLVE|{}|{}|{}|{}|{}|{}",
             self.from, self.to, self.alphabet, self.start, self.end, self.hash
+        )
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn clone_box(&self) -> Box<dyn Message> {
+        Box::new(self.clone())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SolveResponseMessage {
+    pub from: String,
+    pub to: String,
+    pub start: String,
+    pub end: String,
+    pub space_searched: bool,
+    pub solution: Option<String>,
+}
+
+impl Message for SolveResponseMessage {
+    fn from(&self) -> &str {
+        &self.from
+    }
+
+    fn to(&self) -> &str {
+        &self.to
+    }
+
+    fn serialize(&self) -> String {
+        let solution_str = match &self.solution {
+            Some(sol) => sol.clone(),
+            None => "NONE".to_string(),
+        };
+        format!(
+            "SOLVE_RESPONSE|{}|{}|{}|{}|{}|{}",
+            self.from, self.to, self.start, self.end, solution_str, self.space_searched
         )
     }
 
