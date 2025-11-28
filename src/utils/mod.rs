@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::problem::PartOfAProblem;
+use crate::problem::{PartOfAProblem, Problem};
 use std::sync::atomic::{AtomicBool};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -46,7 +46,10 @@ impl Friend {
 #[derive(Debug)]
 pub enum NodeState {
     IDLE,
-    LEADER,
+    LEADER {
+        problem: Option<Problem>,
+        parts: Vec<PartOfAProblem>,
+    },
     WORKER,
 }
 
@@ -90,7 +93,6 @@ impl Node {
         for friend in friends.iter() {
             output.push_str(&format!(" - {:?}\n", friend));
         }
-
         output.push_str("========================\n");
 
         print!("{}", output);
@@ -127,7 +129,7 @@ impl Node {
     }
 
     pub fn is_leader(&self) -> bool {
-        matches!(*self.state.lock().unwrap(), NodeState::LEADER)
+        matches!(*self.state.lock().unwrap(), NodeState::LEADER { .. })
     }
 
     pub fn get_parent_address(&self) -> String {
@@ -142,7 +144,7 @@ impl Node {
 
     pub fn set_state_leader(&self) {
         let mut state = self.state.lock().unwrap();
-        *state = NodeState::LEADER;
+        *state = NodeState::LEADER { problem: None, parts: Vec::new()};
     }
 
     pub fn set_state_worker(&self) {

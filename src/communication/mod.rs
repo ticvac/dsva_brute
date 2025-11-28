@@ -5,7 +5,9 @@ use crate::Node;
 use crate::messages::{AckMessage, CalculatePowerMessage, CalculateResponseMessage, Message, PingMessage, parse_message, SolveProblemMessage, SolveResponseMessage, send_message};
 use std::thread::sleep;
 use std::time::Duration;
-use crate::problem::{merge_parts, Problem, Combinable};
+use crate::problem::{Combinable, Problem, merge_parts, update_state_of_parts};
+use crate::problem::PartOfAProblemState;
+use crate::utils::{NodeState};
 
 mod calc_power;
 mod send_parts;
@@ -206,6 +208,37 @@ pub fn handle_solve_response_message(node: &Node, _message: Box<dyn Message>) {
         send_message(&forward_message, node);
         return;
     }
+    
     print!("Leader handling solve response message...\n");
     println!("Received solve response: {:?}", solve_response);
+
+    if solve_response.solution.is_some() {
+        println!("Solution found by a worker: {}", solve_response.solution.as_ref().unwrap());
+        node.stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        // TODO inform all nodes to stop...
+        return;
+    }
+    
+    let updated_part = crate::problem::PartOfAProblem {
+        alphabet: String::new(), // not needed here
+        start: solve_response.start.clone(),
+        end: solve_response.end.clone(),
+        hash: String::new(), // not needed here
+        state: if solve_response.space_searched {
+            PartOfAProblemState::SearchedAndNotFound
+        } else {
+            PartOfAProblemState::NotDistributed
+        },
+    };
+    
+
+    {
+        let mut state = node.state.lock().unwrap();
+        if let NodeState::LEADER { problem: _, parts: leader_parts } = &mut *state {
+            println!("Updating leader's parts with response...");
+            println!("Before update: {:?}", leader_parts);
+            update_state_of_parts(leader_parts, &updated_part);
+            println!("After update: {:?}", leader_parts);
+        }
+    }
 }

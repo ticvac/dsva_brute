@@ -1,15 +1,17 @@
 use sha2::{Sha256, Digest};
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
-use crate::messages::SolveProblemMessage;
+use crate::{messages::SolveProblemMessage};
 
 pub trait Combinable {
     fn total_combinations(&self) -> usize;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PartOfAProblemState {
     NotDistributed,
     Distributed,
+    SearchedAndNotFound,
+    Solving,
 }
 
 #[derive(Debug, Clone)]
@@ -19,6 +21,18 @@ pub struct PartOfAProblem {
     pub alphabet: String,
     pub hash: String,
     pub state: PartOfAProblemState,
+}
+
+impl PartOfAProblem {
+    pub fn new_from_problem(problem: &Problem, start: String, end: String) -> Self {
+        PartOfAProblem {
+            start,
+            end,
+            alphabet: problem.alphabet.clone(),
+            hash: problem.hash.clone(),
+            state: PartOfAProblemState::NotDistributed,
+        }
+    }
 }
 
 impl Combinable for PartOfAProblem {
@@ -39,10 +53,10 @@ impl Combinable for PartOfAProblem {
     }
 }
 
-pub fn merge_parts(parts: &Vec<PartOfAProblem>) -> PartOfAProblem {
-    let mut sorted_parts = parts.clone();
+
+pub fn sort_vector_of_parts(parts: &mut Vec<PartOfAProblem>) {
+    // sort
     let alphabet = parts[0].alphabet.clone();
-    // Sort by start using the alphabet order
     let alphabet_str = &alphabet;
     let str_to_index = |s: &str| -> usize {
         let alphabet_size = alphabet_str.len();
@@ -50,10 +64,16 @@ pub fn merge_parts(parts: &Vec<PartOfAProblem>) -> PartOfAProblem {
             acc * alphabet_size + alphabet_str.find(c).unwrap()
         })
     };
-    sorted_parts.sort_by_key(|p| str_to_index(&p.start));
-    let hash = sorted_parts[0].hash.clone();
-    let start = sorted_parts.first().unwrap().start.clone();
-    let end = sorted_parts.last().unwrap().end.clone();
+    parts.sort_by_key(|p| str_to_index(&p.start));
+}
+
+// merges as not distributed
+pub fn merge_parts(parts: &Vec<PartOfAProblem>) -> PartOfAProblem {    
+    sort_vector_of_parts(&mut parts.clone());
+    let alphabet = parts[0].alphabet.clone();
+    let hash = parts[0].hash.clone();
+    let start = parts.first().unwrap().start.clone();
+    let end = parts.last().unwrap().end.clone();
     PartOfAProblem {
         start,
         end,
@@ -63,7 +83,114 @@ pub fn merge_parts(parts: &Vec<PartOfAProblem>) -> PartOfAProblem {
     }
 }
 
-#[derive(Debug)]
+// vector of parts 
+pub fn update_state_of_parts(parts: &mut Vec<PartOfAProblem>, updated_part: &PartOfAProblem) {
+    sort_vector_of_parts(parts);
+
+    let mut new_parts = Vec::new();
+    let mut i = 0;
+    let n = parts.len();
+    let mut updated = false;
+
+    while i < n {
+        let part = &parts[i];
+        // If no overlap, just push
+        if updated_part.end < part.start || updated_part.start > part.end {
+            new_parts.push(part.clone());
+            i += 1;
+            continue;
+        }
+
+        // There is overlap, may need to split
+        // 1. Left non-overlapping part
+        if updated_part.start > part.start {
+            let left = PartOfAProblem {
+                start: part.start.clone(),
+                end: prev_str(&updated_part.start, &part.alphabet),
+                alphabet: part.alphabet.clone(),
+                hash: part.hash.clone(),
+                state: part.state.clone(),
+            };
+            new_parts.push(left);
+        }
+        // 2. Middle (overlapping) part: use updated_part's state
+        let overlap_start = std::cmp::max(part.start.clone(), updated_part.start.clone());
+        let overlap_end = std::cmp::min(part.end.clone(), updated_part.end.clone());
+        let middle = PartOfAProblem {
+            start: overlap_start,
+            end: overlap_end,
+            alphabet: part.alphabet.clone(),
+            hash: part.hash.clone(),
+            state: updated_part.state.clone(),
+        };
+        new_parts.push(middle);
+        updated = true;
+
+        // 3. Right non-overlapping part
+        if updated_part.end < part.end {
+            let right = PartOfAProblem {
+                start: next_str(&updated_part.end, &part.alphabet),
+                end: part.end.clone(),
+                alphabet: part.alphabet.clone(),
+                hash: part.hash.clone(),
+                state: part.state.clone(),
+            };
+            new_parts.push(right);
+        }
+        i += 1;
+    }
+
+    // If no overlap found, just insert the updated_part
+    if !updated {
+        new_parts.push(updated_part.clone());
+    }
+
+    // Merge adjacent parts with same state
+    let mut merged: Vec<PartOfAProblem> = Vec::new();
+    for part in new_parts.into_iter() {
+        if let Some(last) = merged.last_mut() {
+            if last.end == prev_str(&part.start, &part.alphabet) && last.state == part.state {
+                last.end = part.end.clone();
+                continue;
+            }
+        }
+        merged.push(part);
+    }
+    *parts = merged;
+}
+
+// Helper: get previous string in alphabet order
+fn prev_str(s: &str, alphabet: &str) -> String {
+    let mut chars: Vec<char> = s.chars().collect();
+    for i in (0..chars.len()).rev() {
+        let pos = alphabet.find(chars[i]).unwrap();
+        if pos > 0 {
+            chars[i] = alphabet.chars().nth(pos - 1).unwrap();
+            break;
+        } else {
+            chars[i] = alphabet.chars().last().unwrap();
+        }
+    }
+    chars.iter().collect()
+}
+
+// Helper: get next string in alphabet order
+fn next_str(s: &str, alphabet: &str) -> String {
+    let mut chars: Vec<char> = s.chars().collect();
+    let base = alphabet.len();
+    for i in (0..chars.len()).rev() {
+        let pos = alphabet.find(chars[i]).unwrap();
+        if pos + 1 < base {
+            chars[i] = alphabet.chars().nth(pos + 1).unwrap();
+            break;
+        } else {
+            chars[i] = alphabet.chars().nth(0).unwrap();
+        }
+    }
+    chars.iter().collect()
+}
+
+#[derive(Debug, Clone)]
 pub struct Problem {
     pub alphabet: String,
     pub start: String,

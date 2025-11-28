@@ -1,7 +1,9 @@
 use std::io::{self, BufRead};
 use crate::Node;
 use crate::messages;
-use crate::utils::parse_address;
+use crate::problem::PartOfAProblem;
+use crate::problem::update_state_of_parts;
+use crate::utils::{parse_address, NodeState};
 
 use messages::{PingMessage};
 use messages::send_message;
@@ -138,9 +140,21 @@ fn handle_solve_command(_node: &Node, parts: Vec<&str>) {
     let hash = parts[4].to_string();
     let start = alphabet.chars().next().unwrap().to_string().repeat(min_length);
     let end = alphabet.chars().last().unwrap().to_string().repeat(max_length);
+    let start_copy = start.clone();
+    let end_copy = end.clone();
     let problem = Problem::new(alphabet, start, end, hash);
     println!("Problem defined: {:?}", problem);
     println!("Total combinations to try: {}", problem.total_combinations());
+    // save problem to node state
+    let mut state = _node.state.lock().unwrap();
+    if let NodeState::LEADER { problem: node_problem, parts: node_parts } = &mut *state {
+        *node_problem = Some(problem.clone());
+        *node_parts = vec![
+            PartOfAProblem::new_from_problem(&problem, start_copy, end_copy)
+        ];
+    }
+    drop(state);
+    // distributing
     let mut available_power = _node.friends.lock().unwrap().iter().filter(|friend | friend.is_child()).map(|friend| friend.power).sum::<u32>();
     available_power += _node.power;
     let parts = problem.divide_into_n(available_power as usize);
@@ -152,12 +166,26 @@ fn handle_solve_command(_node: &Node, parts: Vec<&str>) {
     send_parts_to_friends(_node);
     // solve my part in new thread
     println!("LEADER started solving problem...");
-    let problem_part = _node.solving_part_of_a_problem.lock().unwrap().as_ref().unwrap().clone();
+    let mut problem_part = _node.solving_part_of_a_problem.lock().unwrap().as_ref().unwrap().clone();
+    problem_part.state = crate::problem::PartOfAProblemState::Solving;
     _node.stop_flag.store(false, std::sync::atomic::Ordering::SeqCst);
     let stop_flag = _node.stop_flag.clone();
+    // setting state of my part as solving
+    _node.solving_part_of_a_problem.lock().unwrap().as_mut().unwrap().state = crate::problem::PartOfAProblemState::Solving;
+    // updating leader parts state
+    {
+        let mut binding = _node.state.lock().unwrap();
+        if let NodeState::LEADER { problem: _, parts } = &mut *binding {
+            update_state_of_parts(parts, &problem_part);
+        } else {
+            panic!("Node is not leader anymore!");
+        }
+    }
+
     std::thread::spawn(move || {
         let mut problem = Problem::new_from_part(&problem_part);
         // Pass stop_flag from node (as AtomicBool)
+        // TODO handle results properly
         match problem.brute_force(&*stop_flag) {
             Some(solution) => println!("Solution found: {}", solution),
             None => println!("No solution found in my part."),

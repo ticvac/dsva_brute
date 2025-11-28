@@ -1,6 +1,6 @@
 use crate::utils::{Node, FriendType};
 use crate::messages::{send_message, SolveProblemMessage};
-use crate::problem::PartOfAProblemState;
+use crate::problem::{PartOfAProblemState, update_state_of_parts};
 use std::thread;
 
 /// Sends parts of a problem to friends: for each friend of type Child with a not distributed part, send it.
@@ -16,8 +16,16 @@ pub fn send_parts_to_friends(node: &Node) {
                         let node_clone = node.clone();
                         let friend_address = friend.address.clone();
                         part.state = PartOfAProblemState::Distributed;
-                        let part = part.clone();
-                        to_send.push((node_clone, friend_address, part));
+                        to_send.push((node_clone, friend_address, part.clone()));
+                        // update leader node state parts...
+                        if node.is_leader() {
+                            let mut state_guard = node.state.lock().unwrap();
+                            if let crate::utils::NodeState::LEADER { problem: _, parts } = &mut *state_guard {
+                                println!("Parts of leader before update: {:?}", parts);
+                                update_state_of_parts(parts, &part);
+                                println!("Parts of leader after update: {:?}", parts);
+                            }
+                        }
                     }
                 }
             }

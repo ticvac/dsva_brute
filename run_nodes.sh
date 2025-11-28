@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# 2000 solve ABCDEFGH 8 8 e107aa44a63ac64338cc632f264b6034218710adfcd28f8782d1aaabeb9d7fe9
+
 # Build the project first
 cargo build
 
