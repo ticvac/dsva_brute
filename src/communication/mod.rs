@@ -222,7 +222,7 @@ pub fn handle_solve_response_message(node: &Node, _message: Box<dyn Message>) {
     println!("Received solve response: {:?}", solve_response);
 
     if solve_response.solution.is_some() {
-        println!("Solution found by a worker: {}", solve_response.solution.as_ref().unwrap());
+        println!("!!!!! Solution found - it is {} !!!!!", solve_response.solution.as_ref().unwrap());
         stop_cal_and_propagate(node);
         return;
     }
@@ -246,6 +246,21 @@ pub fn handle_solve_response_message(node: &Node, _message: Box<dyn Message>) {
             println!("Before update: {:?}", leader_parts);
             update_state_of_parts(leader_parts, &updated_part);
             println!("After update: {:?}", leader_parts);
+        }
+    }
+    // if searched entire space
+    {
+        let state = node.state.lock().unwrap();
+        if let NodeState::LEADER { parts, .. } = &*state {
+            if parts.len() == 1 && matches!(parts[0].state, PartOfAProblemState::SearchedAndNotFound) {
+                println!("All parts searched and no solution found. Problem is unsolvable.");
+                thread::spawn({
+                    let node = node.clone();
+                    move || {
+                        stop_cal_and_propagate(&node);
+                    }
+                });
+            }
         }
     }
 }

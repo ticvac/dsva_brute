@@ -212,7 +212,8 @@ fn handle_solve_command(_node: &Node, parts: Vec<&str>) {
                     handle_solve_response_message(&node_clone, Box::new(message));
                     node_clone.solving_part_of_a_problem.lock().unwrap().as_mut().unwrap().state = crate::problem::PartOfAProblemState::SearchedAndNotFound;
                 } else {
-                    node_clone.solving_part_of_a_problem.lock().unwrap().as_mut().unwrap().state = crate::problem::PartOfAProblemState::NotDistributed;
+                    // not needed anymore - found elsewhere or calculations stopped...
+                    // node_clone.solving_part_of_a_problem.lock().unwrap().as_mut().unwrap().state = crate::problem::PartOfAProblemState::NotDistributed;
                 }
                 stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
             },
