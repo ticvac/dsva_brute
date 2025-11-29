@@ -1,8 +1,6 @@
-# stop propagace kdyz reseni
+# detekce prohledani cele casti
 
-# vyhodnoceni vysledku leadera
-
-# detekce spadlych nodu a oznaceni za nepropadane
+# detekce spadlych nodu
 
 # kdyz spadne leader ?
 

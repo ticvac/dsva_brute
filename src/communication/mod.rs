@@ -170,7 +170,11 @@ fn handle_solve_message(_node: &Node, _message: Box<dyn Message>) {
                 // only send if fully searched - if not - received stop signal and parent already knows
                 if space_searched {
                     send_message(&response, &node_clone);
+                    node_clone.solving_part_of_a_problem.lock().unwrap().as_mut().unwrap().state = PartOfAProblemState::SearchedAndNotFound;
+                } else {
+                    *node_clone.solving_part_of_a_problem.lock().unwrap() = None;
                 }
+                stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
             }
         }
         stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);

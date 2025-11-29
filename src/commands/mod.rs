@@ -1,5 +1,6 @@
 use std::io::{self, BufRead};
 use crate::Node;
+use crate::communication::handle_solve_response_message;
 use crate::communication::stop_cal_and_propagate;
 use crate::messages;
 use crate::problem::PartOfAProblem;
@@ -179,13 +180,42 @@ fn handle_solve_command(_node: &Node, parts: Vec<&str>) {
         }
     }
 
+    // Clone the entire node to move into the thread
+    let node_clone = _node.clone();
     std::thread::spawn(move || {
         let mut problem = Problem::new_from_part(&problem_part);
         // Pass stop_flag from node (as AtomicBool)
-        // TODO handle results properly
+        // Now you can use node_clone inside the thread
         match problem.brute_force(&*stop_flag) {
-            Some(solution) => println!("Solution found: {}", solution),
-            None => println!("No solution found in my part."),
+            Some(solution) => {
+                let message = messages::SolveResponseMessage {
+                    from: node_clone.address.clone(),
+                    to: node_clone.address.clone(), // to leader
+                    start: problem_part.start.clone(),
+                    end: problem_part.end.clone(),
+                    solution: Some(solution),
+                    space_searched: true,
+                };
+                handle_solve_response_message(&node_clone, Box::new(message));
+            },
+            None => {
+                let message = messages::SolveResponseMessage {
+                    from: node_clone.address.clone(),
+                    to: node_clone.address.clone(), // to leader
+                    start: problem_part.start.clone(),
+                    end: problem_part.end.clone(),
+                    solution: None,
+                    space_searched: true,
+                };
+                let space_searched = !node_clone.stop_flag.load(std::sync::atomic::Ordering::SeqCst);
+                if space_searched {
+                    handle_solve_response_message(&node_clone, Box::new(message));
+                    node_clone.solving_part_of_a_problem.lock().unwrap().as_mut().unwrap().state = crate::problem::PartOfAProblemState::SearchedAndNotFound;
+                } else {
+                    node_clone.solving_part_of_a_problem.lock().unwrap().as_mut().unwrap().state = crate::problem::PartOfAProblemState::NotDistributed;
+                }
+                stop_flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            },
         }
     });
 }
